@@ -1,21 +1,26 @@
-name = "punchcard"
+# Deployed with unit (github.com/vt100io/unit): mise run build, then unit deploy.
+name       = "punchcard"
 executable = "bin/punchcard"
-port = 8081
-domain = "punchcard.vt100.io"
-secrets = "./secrets.sh"
+port       = 8081 # systemd holds the socket; Tailscale Funnel publishes it for GitHub
+secrets    = "./secrets.sh"
 
 [server]
-host = "punchcard"
+host = "vt100" # over Tailscale
 user = "deploy"
-strict_host_key_checking = false
 
 [sandbox]
-allow_outbound_network = true
-state_directory = true
+allow_outbound_network = true # cloning, mise downloads, GitHub's API
+state_directory        = true # /var/lib/punchcard: workspaces, logs, history, caches
+# Builds run whatever a repo's ci task needs, including tools with JIT
+# compilers (Node, Java), which need memory that is both writable and
+# executable.
+allow_write_execute = true
 
 [env]
 PUNCHCARD_NIGHTLY_TIME = "20:00"
-# GitHub App for cloning and commit statuses. Register at
-# github.com/settings/apps (contents:read, statuses:write, webhook events:
-# push + pull_request), then install it on each owner whose repos you build.
+# The GitHub App punchcard-vt100, owned by github.com/vt100io.
 PUNCHCARD_GITHUB_APP_ID = "5643105"
+# The service runs as a throwaway user with home directories hidden. mise,
+# Go and git keep their caches under HOME, so it points into the state
+# directory, where they survive restarts.
+HOME = "/var/lib/punchcard"
