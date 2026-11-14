@@ -18,6 +18,9 @@ state_directory        = true # /var/lib/punchcard: workspaces, logs, history, c
 # compilers (Node, Java), which need memory that is both writable and
 # executable.
 allow_write_execute = true
+# mise installs Go, Node and the rest under the state directory, and the
+# builds run them from there. systemd mounts it noexec otherwise.
+allow_state_exec    = true
 
 [env]
 PUNCHCARD_NIGHTLY_TIME = "20:00"
