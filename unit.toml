@@ -7,6 +7,9 @@ port       = 8081 # systemd holds the socket
 domain     = "punchcard.vt100.io"
 secrets    = "./secrets.sh"
 
+# Deploy only commits that Punchcard has built and passed.
+ci_check   = "punchcard/ci"
+
 [server]
 host = "vt100" # over Tailscale
 user = "deploy"
