@@ -1,0 +1,21 @@
+name = "punchcard"
+executable = "bin/punchcard"
+port = 8081
+domain = "punchcard.vt100.io"
+secrets = "./secrets.sh"
+
+[server]
+host = "punchcard"
+user = "deploy"
+strict_host_key_checking = false
+
+[sandbox]
+allow_outbound_network = true
+state_directory = true
+
+[env]
+PUNCHCARD_NIGHTLY_TIME = "20:00"
+# GitHub App for cloning and commit statuses. Register at
+# github.com/settings/apps (contents:read, statuses:write, webhook events:
+# push + pull_request), then install it on each owner whose repos you build.
+PUNCHCARD_GITHUB_APP_ID = "5643105"

@@ -1,0 +1,36 @@
+[tools]
+go = "1.27.4"
+
+[tasks.check]
+description = "Check for known vulnerabilities"
+# go run builds govulncheck with this repo's Go. A mise-installed govulncheck
+# is shared by every project on the machine and may be built with another Go.
+run = "go run golang.org/x/vuln/cmd/govulncheck@latest ./..."
+
+[tasks.build]
+description = "Build Punchcard"
+depends = ["check"]
+run = "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/punchcard ."
+
+[tasks.test]
+description = "Run the tests"
+run = "go test ./..."
+
+[tasks.ci]
+description = "What Punchcard runs on push and PR"
+depends = ["build", "test"]
+run = "go vet ./..."
+
+[tasks.serve]
+description = "Run Punchcard on this machine with the GitHub App"
+run = '''
+export PUNCHCARD_SECRET="$(cat ~/.config/punchcard/webhook-secret)"
+export GITHUB_APP_PRIVATE_KEY="$(cat ~/.config/punchcard/github-app.pem)"
+export PUNCHCARD_GITHUB_APP_ID=5643105
+export PORT="${PORT:-8081}"
+go build -o bin/punchcard . && exec bin/punchcard
+'''
+
+[tasks.demo]
+description = "Record demo/demo.gif of punchcard tui (needs vhs)"
+run = "demo/record.sh"
