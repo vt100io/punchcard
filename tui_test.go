@@ -215,3 +215,30 @@ func TestStyleLogLineColours(t *testing.T) {
 		}
 	}
 }
+
+// A skipped build names the task the repo lacks: ci on push, nightly at night.
+func TestNoTaskLabelNamesTheTask(t *testing.T) {
+	for task, want := range map[string]string{"": "no ci task", "ci": "no ci task", "nightly": "no nightly task"} {
+		if _, got, _ := resultLook(Build{Result: resultNoTask, Task: task}, false); got != want {
+			t.Errorf("task %q: label %q, want %q", task, got, want)
+		}
+	}
+}
+
+// unit passed on push, then was skipped at night for lack of a nightly task:
+// its row keeps showing the pass.
+func TestNightlySkipDoesNotHideResult(t *testing.T) {
+	now := time.Now()
+	rows := repoRows(Snapshot{Recent: []Build{
+		{Repo: "vt100io/unit", Task: "nightly", Result: resultNoTask, Finished: now},
+		{Repo: "vt100io/molt", Task: "nightly", Result: resultNoTask, Finished: now},
+		{Repo: "vt100io/unit", Task: "ci", Result: resultPassed, Finished: now.Add(-time.Hour)},
+	}})
+	got := map[string]string{}
+	for _, r := range rows {
+		got[r.name] = r.build.Result
+	}
+	if got["vt100io/unit"] != resultPassed || got["vt100io/molt"] != resultNoTask || len(rows) != 2 {
+		t.Errorf("rows: %v", got)
+	}
+}

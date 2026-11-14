@@ -320,12 +320,18 @@ func repoRows(s Snapshot) []repoRow {
 		rows = append(rows, repoRow{name: s.Running.Repo, build: *s.Running, running: true})
 		seen[s.Running.Repo] = true
 	}
-	for _, b := range s.Recent { // newest first
-		if seen[b.Repo] || b.Result == resultDropped {
-			continue
+	// A nightly run skipped for lack of a nightly task ran nothing, so it
+	// doesn't hide the repo's last real result. A repo whose ci task is gone
+	// still shows its skip: that is its state.
+	quiet := func(b Build) bool { return b.Result == resultNoTask && b.Task != "" && b.Task != ciTask }
+	for _, pass := range []bool{false, true} {
+		for _, b := range s.Recent { // newest first
+			if seen[b.Repo] || b.Result == resultDropped || (!pass && quiet(b)) {
+				continue
+			}
+			seen[b.Repo] = true
+			rows = append(rows, repoRow{name: b.Repo, build: b})
 		}
-		seen[b.Repo] = true
-		rows = append(rows, repoRow{name: b.Repo, build: b})
 	}
 	// Repos only in the queue so far.
 	for _, b := range s.Queue {
@@ -591,7 +597,11 @@ func resultLook(b Build, running bool) (string, string, interface{ RGBA() (r, g,
 	case b.Result == resultError:
 		return "✗", "error", cBad
 	case b.Result == resultNoTask:
-		return "–", "no ci task", cDim
+		task := b.Task
+		if task == "" {
+			task = ciTask
+		}
+		return "–", "no " + task + " task", cDim
 	case b.Result == "":
 		return "○", "queued", cDim
 	}
