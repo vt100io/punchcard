@@ -15,7 +15,7 @@ Hosted CI runners start from nothing on every build: a fresh machine, fresh tool
 
 ## What it deliberately isn't
 
-- **Not a sandbox.** There is no container isolation, and builds share a persistent workspace. **Anyone who can open a pull request on a repo where Punchcard is installed can run code on the server.** Only install it on repos where you trust everyone who can open a PR.
+- **Not a sandbox.** There is no container isolation, and builds share a persistent workspace. **Anyone with write access to a repo where Punchcard is installed can run code on the server.** Pull requests are built only when their author has write access, so on a public repo a stranger's PR is ignored: no build, no status.
 - **Not parallel.** One build runs at a time, which keeps workspaces safe and the code simple.
 - **Not a platform.** There are no agents, runners, plugins or marketplace.
 

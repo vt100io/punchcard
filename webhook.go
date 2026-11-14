@@ -12,10 +12,11 @@ import (
 	"strings"
 )
 
-// webhookHandler accepts push and pull_request events. Anyone who can make
-// GitHub deliver a signed webhook is trusted to run the repo's ci task: install
-// Punchcard only on repos where you trust everyone who can open a PR.
-func webhookHandler(cfg Config) http.HandlerFunc {
+// webhookHandler accepts push and pull_request events. Pushes to the default
+// branch need write access already. Pull requests are built only when their
+// author has write access too: on a public repo anyone can open one, and a
+// build runs whatever the PR's ci task says.
+func webhookHandler(cfg Config, gh *GitHubClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -74,6 +75,12 @@ func webhookHandler(cfg Config) http.HandlerFunc {
 			if ev.Action != "opened" && ev.Action != "synchronize" && ev.Action != "reopened" {
 				break
 			}
+			if ok, err := mayBuild(gh, ev); !ok {
+				slog.Info("ignoring pull request: author lacks write access",
+					"repo", ev.Repository.FullName, "pr", ev.Number,
+					"who", ev.PullRequest.User.Login, "association", ev.PullRequest.AuthorAssociation, "err", err)
+				break
+			}
 
 			slog.Info("inbound pull request",
 				"repo", ev.Repository.FullName,
@@ -102,6 +109,23 @@ func webhookHandler(cfg Config) http.HandlerFunc {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	}
+}
+
+// canWrite is (*GitHubClient).CanWrite; tests replace it.
+var canWrite = (*GitHubClient).CanWrite
+
+// mayBuild reports whether a pull request's author has write access to the
+// repo. It asks GitHub; without an App it goes by the author's association
+// with the repo. An error means no.
+func mayBuild(gh *GitHubClient, ev PullRequestEvent) (bool, error) {
+	if gh == nil {
+		switch ev.PullRequest.AuthorAssociation {
+		case "OWNER", "MEMBER", "COLLABORATOR":
+			return true, nil
+		}
+		return false, nil
+	}
+	return canWrite(gh, ev.Repository.FullName, ev.PullRequest.User.Login)
 }
 
 func verifyGitHubSignature(body []byte, signature string, secret string) bool {

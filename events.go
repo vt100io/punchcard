@@ -24,7 +24,8 @@ type PullRequestEvent struct {
 		User struct {
 			Login string `json:"login"`
 		} `json:"user"`
-		Head struct {
+		AuthorAssociation string `json:"author_association"` // OWNER, MEMBER, COLLABORATOR, CONTRIBUTOR, NONE, …
+		Head              struct {
 			Ref string `json:"ref"`
 			SHA string `json:"sha"`
 		} `json:"head"`

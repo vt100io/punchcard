@@ -102,7 +102,7 @@ func run() error {
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /builds/{id}", logHandler(cfg))
-	mux.Handle("/", webhookHandler(cfg))
+	mux.Handle("/", webhookHandler(cfg, gh))
 
 	srv := &http.Server{
 		Handler:           mux,

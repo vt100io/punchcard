@@ -14,6 +14,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"sync"
 	"time"
@@ -152,6 +153,22 @@ func (c *GitHubClient) installationToken(id int64) (string, error) {
 	}
 	c.tokens[id] = cachedToken{token: result.Token, exp: result.ExpiresAt}
 	return result.Token, nil
+}
+
+// CanWrite reports whether user may push to repo: write, maintain or admin
+// access. GitHub reports maintain as write.
+func (c *GitHubClient) CanWrite(repo, user string) (bool, error) {
+	token, err := c.Token(repo)
+	if err != nil {
+		return false, err
+	}
+	var res struct {
+		Permission string `json:"permission"` // admin, write, read or none
+	}
+	if err := c.request(token, "/repos/"+repo+"/collaborators/"+url.PathEscape(user)+"/permission", &res); err != nil {
+		return false, err
+	}
+	return res.Permission == "admin" || res.Permission == "write", nil
 }
 
 // AppRepo is a repo the App is installed on.

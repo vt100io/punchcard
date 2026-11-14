@@ -19,7 +19,7 @@ The `build` task in `mise.toml` depends on `check` (govulncheck), so `mise run b
 
 ## Architecture
 
-Punchcard is a single-binary Go CI server. The server is stdlib only; only the TUI (`tui.go`) uses Charm's Bubble Tea and Lip Gloss. It receives GitHub App webhooks and runs `mise` tasks in persistent local workspaces. It's a personal tool: anyone who can open a PR is trusted, so there is no fork/owner filtering.
+Punchcard is a single-binary Go CI server. The server is stdlib only; only the TUI (`tui.go`) uses Charm's Bubble Tea and Lip Gloss. It receives GitHub App webhooks and runs `mise` tasks in persistent local workspaces. It's a personal tool: anyone with write access to a repo is trusted. Pull requests are built only when their author has write access (`mayBuild`: GitHub's collaborator permission API, or `author_association` without an App), so strangers' PRs on public repos never run.
 
 **Request flow:**
 1. `webhook.go` — verifies HMAC-SHA256 (`PUNCHCARD_SECRET`), handles `push` to the repo's default branch and `pull_request` (`opened`/`synchronize`/`reopened`), and calls `Schedule(job)`. PR jobs always use the base repo.
