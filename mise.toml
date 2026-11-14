@@ -31,6 +31,16 @@ export PORT="${PORT:-8081}"
 go build -o bin/punchcard . && exec bin/punchcard
 '''
 
+[tasks.tui]
+description = "Watch Punchcard on the server it's deployed to"
+# The server is the one in unit.toml. Its control socket and logs belong to
+# the service's own user, so the TUI runs there as root, with the deployed
+# binary.
+run = '''
+host=$(sed -n 's/^host *= *"\([^"]*\)".*/\1/p' unit.toml)
+exec ssh -t "root@$host" STATE_DIRECTORY=/var/lib/punchcard /opt/unit/punchcard/current/bin tui
+'''
+
 [tasks.demo]
 description = "Record demo/demo.gif of punchcard tui (needs vhs)"
 run = "demo/record.sh"

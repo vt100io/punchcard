@@ -172,7 +172,7 @@ punchcard tui
 
 It shows each repo's latest result, the queue (including builds dropped for a newer push), and the log of the selected repo's build, streaming as it runs. Use `↑`/`↓` to pick a repo, `PgUp`/`PgDn` to scroll the log, `g`/`G` for the top or to follow new lines, and `q` to quit.
 
-The TUI talks to the server over a unix socket in the state directory (`punchcard.sock`), readable only by the server's user. To watch a remote server, SSH to it and run it there: `ssh -t ci-host punchcard tui`. Quitting the TUI never affects the server, and the TUI reconnects by itself when the server restarts.
+The TUI talks to the server over a unix socket in the state directory (`punchcard.sock`), readable only by the server's user. To watch a remote server, SSH to it and run it there. Deployed with unit, the server runs as a throwaway user, so run the TUI as root and point it at the server's state directory: `ssh -t root@ci-host STATE_DIRECTORY=/var/lib/punchcard /opt/unit/punchcard/current/bin tui`. In this repo, `mise run tui` does that for the server in `unit.toml`. Quitting the TUI never affects the server, and the TUI reconnects by itself when the server restarts.
 
 ### Build logs
 
