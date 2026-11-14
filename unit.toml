@@ -1,7 +1,10 @@
 # Deployed with unit (github.com/vt100io/unit): mise run build, then unit deploy.
 name       = "punchcard"
 executable = "bin/punchcard"
-port       = 8081 # systemd holds the socket; Tailscale Funnel publishes it for GitHub
+port       = 8081 # systemd holds the socket
+# Caddy serves it with a Let's Encrypt certificate. This is the GitHub App's
+# webhook URL, and build logs are linked from here.
+domain     = "punchcard.vt100.io"
 secrets    = "./secrets.sh"
 
 [server]
