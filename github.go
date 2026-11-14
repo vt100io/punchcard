@@ -132,7 +132,12 @@ func (c *GitHubClient) Token(repoFullName string) (string, error) {
 		id = inst.ID
 		c.installations[repoFullName] = id
 	}
+	return c.installationToken(id)
+}
 
+// installationToken returns a token for installation id, from the cache if
+// it has more than five minutes left. The caller holds c.mu.
+func (c *GitHubClient) installationToken(id int64) (string, error) {
 	if t, ok := c.tokens[id]; ok && time.Now().Before(t.exp.Add(-5*time.Minute)) {
 		return t.token, nil
 	}
@@ -147,6 +152,80 @@ func (c *GitHubClient) Token(repoFullName string) (string, error) {
 	}
 	c.tokens[id] = cachedToken{token: result.Token, exp: result.ExpiresAt}
 	return result.Token, nil
+}
+
+// AppRepo is a repo the App is installed on.
+type AppRepo struct {
+	FullName      string // "owner/repo"
+	DefaultBranch string
+}
+
+// Repos lists every repo the App can see, across all its installations,
+// except archived ones. Installing the App is how a repo becomes known; no
+// push is needed.
+func (c *GitHubClient) Repos() ([]AppRepo, error) {
+	if c == nil {
+		return nil, nil
+	}
+	var installations []struct {
+		ID int64 `json:"id"`
+	}
+	if err := c.appRequest(http.MethodGet, "/app/installations?per_page=100", http.StatusOK, &installations); err != nil {
+		return nil, fmt.Errorf("listing App installations: %w", err)
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var repos []AppRepo
+	for _, inst := range installations {
+		token, err := c.installationToken(inst.ID)
+		if err != nil {
+			return nil, err
+		}
+		for page := 1; ; page++ {
+			var res struct {
+				Repositories []struct {
+					FullName      string `json:"full_name"`
+					DefaultBranch string `json:"default_branch"`
+					Archived      bool   `json:"archived"`
+				} `json:"repositories"`
+			}
+			path := fmt.Sprintf("/installation/repositories?per_page=100&page=%d", page)
+			if err := c.request(token, path, &res); err != nil {
+				return nil, fmt.Errorf("listing repos of installation %d: %w", inst.ID, err)
+			}
+			for _, r := range res.Repositories {
+				c.installations[r.FullName] = inst.ID
+				if !r.Archived {
+					repos = append(repos, AppRepo{FullName: r.FullName, DefaultBranch: r.DefaultBranch})
+				}
+			}
+			if len(res.Repositories) < 100 {
+				break
+			}
+		}
+	}
+	return repos, nil
+}
+
+// request GETs path with an installation token and decodes the JSON reply.
+func (c *GitHubClient) request(token, path string, out any) error {
+	req, err := http.NewRequest(http.MethodGet, "https://api.github.com"+path, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("GitHub returned %d: %s", resp.StatusCode, body)
+	}
+	return json.NewDecoder(resp.Body).Decode(out)
 }
 
 // appRequest calls the GitHub API authenticated as the App itself (JWT) and

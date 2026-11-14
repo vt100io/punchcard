@@ -19,6 +19,7 @@ import (
 type Config struct {
 	Secret      string // webhook HMAC secret
 	NightlyTime string // "HH:MM" for the nightly scan, empty to disable
+	PublicURL   string // this server's public URL, for log links in builds no webhook started
 	StateDir    string // root for workspaces/ and reports/
 }
 
@@ -94,8 +95,9 @@ func run() error {
 	slog.Info("control socket ready", "path", cfg.SocketPath())
 
 	go startWorker(cfg, gh)
+	go buildNewRepos(cfg, gh)
 	if cfg.NightlyTime != "" {
-		go startNightlyScheduler(cfg)
+		go startNightlyScheduler(cfg, gh)
 	}
 
 	mux := http.NewServeMux()
@@ -143,6 +145,7 @@ func loadConfig() (Config, error) {
 	cfg := Config{
 		Secret:      secret,
 		NightlyTime: os.Getenv("PUNCHCARD_NIGHTLY_TIME"),
+		PublicURL:   strings.TrimSuffix(os.Getenv("PUNCHCARD_URL"), "/"),
 		StateDir:    stateDir(),
 	}
 	slog.Info("config loaded", "state_dir", cfg.StateDir, "nightly", cfg.NightlyTime)

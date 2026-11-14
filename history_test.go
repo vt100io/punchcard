@@ -180,6 +180,27 @@ func TestRunJob(t *testing.T) {
 		}
 	})
 
+	// At night a repo without a nightly task runs ci, on its default
+	// branch's tip, and the status lands on that commit.
+	t.Run("nightly runs ci without a nightly task", func(t *testing.T) {
+		useTestHistory(t)
+		statuses := captureStatuses(t)
+		job := localRepo(t, "[tasks.ci]\nrun = \"echo nightly ci\"\n")
+		tip := job.CommitSHA
+		job.CommitSHA, job.EventSource, job.Target = "", "nightly", "nightly"
+
+		if r := runJob(Config{StateDir: t.TempDir()}, nil, job); !r.Clean {
+			t.Fatalf("build failed: %s", r.ErrMsg)
+		}
+		b := history.Recent(1, "")[0]
+		if b.Task != ciTask || b.SHA != tip || b.Result != resultPassed {
+			t.Errorf("recorded task %q sha %q result %q, want ci on %s, passed", b.Task, b.SHA, b.Result, tip)
+		}
+		if got := strings.Join(*statuses, " "); got != "pending success" {
+			t.Errorf("statuses = %q, want %q", got, "pending success")
+		}
+	})
+
 	// A repo without a ci task hasn't opted in: no status is posted, and
 	// its tools are not installed.
 	t.Run("no ci task", func(t *testing.T) {

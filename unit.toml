@@ -24,6 +24,8 @@ allow_state_exec    = true
 
 [env]
 PUNCHCARD_NIGHTLY_TIME = "20:00"
+# Log links for builds no webhook started (nightly and first builds).
+PUNCHCARD_URL = "https://punchcard.vt100.io"
 # The GitHub App punchcard-vt100, owned by github.com/vt100io.
 PUNCHCARD_GITHUB_APP_ID = "5643105"
 # The service runs as a throwaway user with home directories hidden. mise,

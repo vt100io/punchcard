@@ -23,10 +23,10 @@ type Job struct {
 	CommitSHA   string // empty means the remote's default branch
 	Target      string // mise task to run
 	TriggeredBy string // GitHub username
-	EventSource string // "push", "pull_request" or "nightly"
+	EventSource string // "push", "pull_request", "nightly" or "first"
 	Branch      string
 	PR          int       // pull request number, 0 if not a PR
-	BaseURL     string    // public URL of this server, for log links; empty for nightly
+	BaseURL     string    // public URL of this server, for log links; empty for nightly and first builds
 	Queued      time.Time // set by Schedule
 
 	// done, if set, receives the result when the job finishes.
@@ -197,8 +197,12 @@ func runJob(cfg Config, gh *GitHubClient, j Job) BuildResult {
 	} else {
 		defer f.Close()
 		logFile = f
-		if j.BaseURL != "" {
-			targetURL = j.BaseURL + "/builds/" + b.ID
+		base := j.BaseURL
+		if base == "" {
+			base = cfg.PublicURL
+		}
+		if base != "" {
+			targetURL = base + "/builds/" + b.ID
 		}
 	}
 	out := io.MultiWriter(logFile, &lineWriter{id: b.ID})
@@ -234,6 +238,23 @@ func runJob(cfg Config, gh *GitHubClient, j Job) BuildResult {
 		b.Result = resultError
 		status("error", "Checkout failed")
 		return result
+	}
+
+	// Nightly and first builds name no commit. They build the default
+	// branch's tip and post its status there, so a repo that breaks without
+	// a commit (a new vulnerability, a vanished download) shows it on GitHub.
+	if j.CommitSHA == "" {
+		if sha, err := exec.Command("git", "-C", dir, "rev-parse", "HEAD").Output(); err == nil {
+			j.CommitSHA = strings.TrimSpace(string(sha))
+			b.SHA = j.CommitSHA
+			fmt.Fprintf(out, "commit:  %s (default branch)\n", j.CommitSHA)
+		}
+	}
+	// At night, a repo without a nightly task runs its ci task instead.
+	if j.EventSource == "nightly" && j.Target != ciTask && !hasTask(dir, j) {
+		fmt.Fprintf(out, "no %q task, running %q\n", j.Target, ciTask)
+		j.Target = ciTask
+		b.Task = ciTask
 	}
 
 	// A repo opts in by defining the task. Without it, post nothing: the App

@@ -10,7 +10,7 @@ Hosted CI runners start from nothing on every build: a fresh machine, fresh tool
 - **mise is the secret weapon.** Toolchains are pinned in the repo, and mise installs each version once and reuses it.
 - **Checks on GitHub.** A GitHub App posts pending, passed and failed checks on commits and pull requests, each linked to its build log.
 - **A terminal UI.** `punchcard tui` shows live builds in the style of lazygit.
-- **Nightly scan.** An optional `nightly` task runs across every repo, including the ones nobody has pushed to in months, and leaves a plain-text report.
+- **Builds without commits.** Installing the App is enough: every repo it can see gets a first build, and every night all of them are built again, including the ones nobody has pushed to in months. A repo that breaks on its own, from a new vulnerability or a vanished download, turns red on GitHub.
 - **One convention, no per-project config.** A repo opts in by defining a `ci` task. The server itself needs a webhook secret and the App's credentials.
 
 ## What it deliberately isn't
@@ -153,14 +153,19 @@ If it runs in `mise`, it runs in Punchcard.
 | Variable | Value |
 |---|---|
 | `CI` | `true` |
-| `PUNCHCARD_EVENT` | `push`, `pull_request` or `nightly` |
+| `PUNCHCARD_EVENT` | `push`, `pull_request`, `nightly` or `first` |
 | `PUNCHCARD_REPO` | `owner/repo` |
 | `PUNCHCARD_SHA` | The commit being built |
 | `PUNCHCARD_BRANCH` | The branch being built |
 
-### Nightly scan
+### Builds without commits
 
-If `PUNCHCARD_NIGHTLY_TIME` is set (as `HH:MM`), Punchcard runs a `nightly` task in every repo it has built before, for example a vulnerability scan, and writes a plain-text report to `$STATE_DIRECTORY/reports/`. Repos without a `nightly` task are listed as not scanned.
+Hosted CI only runs when someone commits, so a repo nobody touches can break without anyone noticing. Punchcard builds repos on its own as well:
+
+- **First build.** At startup, every repo the App is installed on that Punchcard hasn't built yet gets a build of its default branch. Install the App and the repos show up, no push needed.
+- **Nightly.** If `PUNCHCARD_NIGHTLY_TIME` is set (as `HH:MM`), Punchcard builds every repo the App can see, plus any it has built before, on the tip of its default branch. It runs the repo's `nightly` task, or `ci` if there isn't one, posts the result as the commit's check, and writes a plain-text report to `$STATE_DIRECTORY/reports/`.
+
+Archived repos are left out, and repos without a `ci` task are skipped as always. Set `PUNCHCARD_URL` so these builds link to their logs: a webhook tells Punchcard its own address, but nothing else does.
 
 ## Watching builds
 
@@ -198,10 +203,11 @@ History is not served over HTTP: an index of builds would reveal every log ID.
 | `PUNCHCARD_SECRET` | yes | Webhook secret, the same value as in the App settings |
 | `PUNCHCARD_GITHUB_APP_ID` | yes, with GitHub | The App's ID |
 | `GITHUB_APP_PRIVATE_KEY` | yes, with GitHub | The App's private key (PEM) |
-| `PUNCHCARD_NIGHTLY_TIME` | no | `HH:MM` to run the nightly scan |
+| `PUNCHCARD_NIGHTLY_TIME` | no | `HH:MM` to build every repo each night |
+| `PUNCHCARD_URL` | no | This server's public URL, for log links on nightly and first builds |
 | `PORT` | no | Port to listen on, default 8081. Ignored under systemd socket activation |
 
-Secrets are read from `$CREDENTIALS_DIRECTORY` (systemd `LoadCredential`) if available, otherwise from the environment. Workspaces, logs, history and reports live under `$STATE_DIRECTORY` (systemd `StateDirectory`), or `~/.local/state/punchcard` otherwise. Everything else, such as the repo, its default branch and the App installation, comes from the webhook payload.
+Secrets are read from `$CREDENTIALS_DIRECTORY` (systemd `LoadCredential`) if available, otherwise from the environment. Workspaces, logs, history and reports live under `$STATE_DIRECTORY` (systemd `StateDirectory`), or `~/.local/state/punchcard` otherwise. Everything else, such as the repos, their default branches and the App installations, comes from GitHub.
 
 Without `PUNCHCARD_GITHUB_APP_ID`, Punchcard clones over SSH using your own keys and doesn't post checks. That's handy for trying it without GitHub, by sending it webhooks yourself.
 

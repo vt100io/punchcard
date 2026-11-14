@@ -62,6 +62,8 @@ func (b Build) Trigger() string {
 		return "push " + b.Branch
 	case "pull_request":
 		return "pr #" + strconv.Itoa(b.PR) + " " + b.Branch
+	case "first":
+		return "first build"
 	}
 	return b.Event
 }
