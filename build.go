@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log/slog"
@@ -295,6 +297,16 @@ func runJob(cfg Config, gh *GitHubClient, j Job) BuildResult {
 	}
 	result.Clean = true
 	l.Info("construction successful", "duration", dur)
+	// Publish what the build produced, so a deploy can prove it ships the
+	// same bytes: one status per binary, its checksum as the description.
+	// Before the success status, so whoever waits for success finds them.
+	b.Binaries = binaries(dir, taskStart)
+	for name, sum := range b.Binaries {
+		fmt.Fprintf(out, "sha256:  %s  %s\n", sum, name)
+		if j.CommitSHA != "" {
+			postStatus(gh, j.RepoName, j.CommitSHA, "punchcard/sha256 "+name, "success", sum, targetURL)
+		}
+	}
 	finish("PASSED")
 	b.Result = resultPassed
 	status("success", "Build passed")
@@ -360,6 +372,39 @@ func mise(dir string, j Job, args ...string) *exec.Cmd {
 
 // setCommitStatus posts a commit status; tests replace it to see what was posted.
 var setCommitStatus = (*GitHubClient).SetCommitStatus
+
+// postStatus posts any commit status; tests replace it.
+var postStatus = (*GitHubClient).PostStatus
+
+// binaries returns the SHA-256 of each file in dir/bin written since start:
+// what this build produced, not what an earlier one left behind.
+func binaries(dir string, start time.Time) map[string]string {
+	entries, err := os.ReadDir(filepath.Join(dir, "bin"))
+	if err != nil {
+		return nil
+	}
+	sums := map[string]string{}
+	for _, e := range entries {
+		info, err := e.Info()
+		if err != nil || !info.Mode().IsRegular() || info.ModTime().Before(start) || len(sums) == 10 {
+			continue
+		}
+		f, err := os.Open(filepath.Join(dir, "bin", e.Name()))
+		if err != nil {
+			continue
+		}
+		h := sha256.New()
+		_, err = io.Copy(h, f)
+		f.Close()
+		if err == nil {
+			sums["bin/"+e.Name()] = hex.EncodeToString(h.Sum(nil))
+		}
+	}
+	if len(sums) == 0 {
+		return nil
+	}
+	return sums
+}
 
 // checkout brings dir to the exact commit for j, cloning on first use, and
 // trusts its mise config.

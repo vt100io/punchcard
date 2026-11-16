@@ -40,6 +40,8 @@ type Build struct {
 	Queued   time.Time `json:"queued,omitzero"` // when the webhook or nightly scan asked for it
 	Started  time.Time `json:"started,omitzero"`
 	Finished time.Time `json:"finished,omitzero"`
+	// Binaries maps each file the build wrote to bin/ to its SHA-256.
+	Binaries map[string]string `json:"binaries,omitempty"`
 }
 
 func newBuild(j Job) Build {

@@ -68,10 +68,15 @@ func newGitHubClient() (*GitHubClient, error) {
 	}, nil
 }
 
-// SetCommitStatus posts a commit status to GitHub.
+// SetCommitStatus posts the punchcard/ci commit status to GitHub.
 // state is one of: "pending", "success", "failure", "error".
 // repoFullName is "owner/repo". targetURL, if set, is linked from the check.
 func (c *GitHubClient) SetCommitStatus(repoFullName, sha, state, description, targetURL string) {
+	c.PostStatus(repoFullName, sha, "punchcard/ci", state, description, targetURL)
+}
+
+// PostStatus posts a commit status named context to GitHub.
+func (c *GitHubClient) PostStatus(repoFullName, sha, context, state, description, targetURL string) {
 	if c == nil {
 		return
 	}
@@ -84,7 +89,7 @@ func (c *GitHubClient) SetCommitStatus(repoFullName, sha, state, description, ta
 	body := map[string]string{
 		"state":       state,
 		"description": description,
-		"context":     "punchcard/ci",
+		"context":     context,
 	}
 	if targetURL != "" {
 		body["target_url"] = targetURL
@@ -114,7 +119,7 @@ func (c *GitHubClient) SetCommitStatus(repoFullName, sha, state, description, ta
 		return
 	}
 
-	slog.Info("GitHub status posted", "repo", repoFullName, "sha", shortSHA(sha), "state", state)
+	slog.Info("GitHub status posted", "repo", repoFullName, "sha", shortSHA(sha), "context", context, "state", state)
 }
 
 // Token returns an installation access token that can act on repoFullName.

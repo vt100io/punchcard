@@ -180,6 +180,49 @@ func TestRunJob(t *testing.T) {
 		}
 	})
 
+	// A passing build publishes the checksum of each binary it wrote, and
+	// leaves out what an earlier build left in bin/.
+	t.Run("publishes binary checksums", func(t *testing.T) {
+		useTestHistory(t)
+		captureStatuses(t)
+		var posted []string
+		old := postStatus
+		postStatus = func(_ *GitHubClient, _, _, context, state, desc, _ string) {
+			posted = append(posted, context+" "+state+" "+desc)
+		}
+		t.Cleanup(func() { postStatus = old })
+
+		job := localRepo(t, "[tasks.ci]\nrun = \"mkdir -p bin && printf hello > bin/app\"\n")
+		cfg := Config{StateDir: t.TempDir()}
+		if r := runJob(cfg, nil, job); !r.Clean {
+			t.Fatalf("first build failed: %s", r.ErrMsg)
+		}
+		// bin/ is ignored by git in real repos, so it survives between
+		// builds; here a file an earlier build left behind.
+		stale := filepath.Join(cfg.WorkspaceDir(), job.RepoName, "bin", "old")
+		writeFile(t, stale, "from an earlier build")
+		past := time.Now().Add(-time.Hour)
+		if err := os.Chtimes(stale, past, past); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(cfg.WorkspaceDir(), job.RepoName, ".git", "info", "exclude"), []byte("bin/\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		posted = nil
+
+		if r := runJob(cfg, nil, job); !r.Clean {
+			t.Fatalf("build failed: %s", r.ErrMsg)
+		}
+		// sha256 of "hello"
+		want := "punchcard/sha256 bin/app success 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+		if strings.Join(posted, "|") != want {
+			t.Errorf("posted %q, want %q", posted, want)
+		}
+		if b := history.Recent(1, "")[0]; len(b.Binaries) != 1 || b.Binaries["bin/app"] == "" {
+			t.Errorf("history binaries = %v", b.Binaries)
+		}
+	})
+
 	// At night a repo without a nightly task runs ci, on its default
 	// branch's tip, and the status lands on that commit.
 	t.Run("nightly runs ci without a nightly task", func(t *testing.T) {

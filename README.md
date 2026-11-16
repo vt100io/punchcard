@@ -8,7 +8,7 @@ Hosted CI runners start from nothing on every build: a fresh machine, fresh tool
 
 - **No CI-only language.** No YAML workflows. The pipeline is a [mise](https://mise.jdx.dev) task in your repo, so `mise run ci` on your laptop is exactly what CI runs. If it passes locally it passes in CI, and a CI failure can be debugged on your own machine.
 - **mise is the secret weapon.** Toolchains are pinned in the repo, and mise installs each version once and reuses it.
-- **Checks on GitHub.** A GitHub App posts pending, passed and failed checks on commits and pull requests, each linked to its build log.
+- **Checks on GitHub.** A GitHub App posts pending, passed and failed checks on commits and pull requests, each linked to its build log. A passing build also publishes the SHA-256 of each binary it wrote to `bin/`, as a status named `punchcard/sha256 bin/<name>`, so a deploy can prove it ships the same bytes ([unit](https://github.com/vt100io/unit) does).
 - **A terminal UI.** `punchcard tui` shows live builds in the style of lazygit.
 - **Builds without commits.** Installing the App is enough: every repo it can see gets a first build, and every night all of them are built again, including the ones nobody has pushed to in months. A repo that breaks on its own, from a new vulnerability or a vanished download, turns red on GitHub.
 - **One convention, no per-project config.** A repo opts in by defining a `ci` task. The server itself needs a webhook secret and the App's credentials.

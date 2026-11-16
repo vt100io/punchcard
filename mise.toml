@@ -10,7 +10,7 @@ run = "go run golang.org/x/vuln/cmd/govulncheck@latest ./..."
 [tasks.build]
 description = "Build Punchcard"
 depends = ["check"]
-run = "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/punchcard ."
+run = "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o bin/punchcard ."
 
 [tasks.test]
 description = "Run the tests"
@@ -28,7 +28,7 @@ export PUNCHCARD_SECRET="$(cat ~/.config/punchcard/webhook-secret)"
 export GITHUB_APP_PRIVATE_KEY="$(cat ~/.config/punchcard/github-app.pem)"
 export PUNCHCARD_GITHUB_APP_ID=5643105
 export PORT="${PORT:-8081}"
-go build -o bin/punchcard . && exec bin/punchcard
+go build -trimpath -o bin/punchcard . && exec bin/punchcard
 '''
 
 [tasks.tui]
